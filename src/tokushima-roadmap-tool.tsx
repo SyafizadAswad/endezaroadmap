@@ -144,10 +144,17 @@ function CourseRoadmapTool() {
         const allSubjects = await dataService.getAllSubjects();
         setSubjects(allSubjects);
         
-        // Update career relevance scores using Gemini API
+        // Update career relevance scores using Gemini API (non-blocking)
         if (process.env.REACT_APP_GEMINI_API_KEY) {
-          const updatedSubjects = await geminiService.updateCareerRelevance(allSubjects);
-          setSubjects(updatedSubjects);
+          try {
+            console.log('Updating career relevance scores...');
+            const updatedSubjects = await geminiService.updateCareerRelevance(allSubjects);
+            setSubjects(updatedSubjects);
+            console.log('Career relevance scores updated successfully');
+          } catch (relevanceError) {
+            console.warn('Failed to update career relevance scores, using original data:', relevanceError);
+            // Continue with original subjects if career relevance update fails
+          }
         }
       } catch (error) {
         console.error('Error loading subjects:', error);
@@ -171,11 +178,19 @@ function CourseRoadmapTool() {
         throw new Error('Gemini API key not configured');
       }
 
+      console.log('Generating roadmap for:', dreamOccupation);
+      console.log('Number of subjects available:', subjects.length);
+      
       const generatedRoadmap = await geminiService.generateRoadmap(dreamOccupation, subjects);
+      console.log('Generated roadmap:', generatedRoadmap);
       setRoadmap(generatedRoadmap);
     } catch (error) {
       console.error('Error generating roadmap:', error);
-      setError('Failed to generate roadmap. Please check your API key and try again.');
+      if (error instanceof Error) {
+        setError(`Failed to generate roadmap: ${error.message}`);
+      } else {
+        setError('Failed to generate roadmap. Please check your API key and try again.');
+      }
     } finally {
       setIsLoading(false);
     }

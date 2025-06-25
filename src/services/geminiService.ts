@@ -45,6 +45,37 @@ export interface GeneratedRoadmap {
 export class GeminiService {
   private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
+  private parseJSONResponse(text: string): any {
+    try {
+      // First, try to parse as-is
+      return JSON.parse(text);
+    } catch (error) {
+      // If that fails, try to extract JSON from markdown code blocks
+      const jsonMatch = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+      if (jsonMatch) {
+        try {
+          return JSON.parse(jsonMatch[1]);
+        } catch (parseError) {
+          console.error('Failed to parse JSON from code block:', parseError);
+          throw new Error('Invalid JSON response from AI');
+        }
+      }
+      
+      // If no code block found, try to find JSON object in the text
+      const jsonObjectMatch = text.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        try {
+          return JSON.parse(jsonObjectMatch[0]);
+        } catch (parseError) {
+          console.error('Failed to parse JSON object from text:', parseError);
+          throw new Error('Invalid JSON response from AI');
+        }
+      }
+      
+      throw new Error('No valid JSON found in response');
+    }
+  }
+
   async generateRoadmap(occupation: string, subjects: Subject[]): Promise<GeneratedRoadmap> {
     try {
       const prompt = this.createRoadmapPrompt(occupation, subjects);
@@ -52,8 +83,8 @@ export class GeminiService {
       const response = await result.response;
       const text = response.text();
       
-      // Parse the JSON response
-      const roadmapData = JSON.parse(text);
+      // Parse the JSON response, handling markdown formatting
+      const roadmapData = this.parseJSONResponse(text);
       return roadmapData;
     } catch (error) {
       console.error('Error generating roadmap:', error);
@@ -68,8 +99,8 @@ export class GeminiService {
       const response = await result.response;
       const text = response.text();
       
-      // Parse the JSON response
-      const updatedSubjects = JSON.parse(text);
+      // Parse the JSON response, handling markdown formatting
+      const updatedSubjects = this.parseJSONResponse(text);
       return updatedSubjects;
     } catch (error) {
       console.error('Error updating career relevance:', error);
@@ -99,7 +130,8 @@ Requirements:
 - Calculate total credits
 - Provide detailed reasoning for subject selection
 
-Return the response as a valid JSON object with this structure:
+IMPORTANT: Return ONLY a valid JSON object with this exact structure, no markdown formatting or additional text:
+
 {
   "title": "Roadmap Title",
   "description": "Brief description of the roadmap",
@@ -149,11 +181,9 @@ Consider:
 
 Score from 0.0 (not relevant) to 1.0 (highly relevant).
 
-Return the updated subjects array with modified career_relevance scores:
+IMPORTANT: Return ONLY the updated subjects array as valid JSON, no markdown formatting or additional text. Update only the career_relevance field for each subject. Keep all other fields unchanged.
 
 ${JSON.stringify(subjects, null, 2)}
-
-Update only the career_relevance field for each subject. Keep all other fields unchanged.
 `;
   }
 }
