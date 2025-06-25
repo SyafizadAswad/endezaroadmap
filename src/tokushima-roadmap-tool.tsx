@@ -22,6 +22,10 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
   };
 
   const renderConnections = () => {
+    if (!roadmap.nodes || !Array.isArray(roadmap.nodes)) {
+      return [];
+    }
+    
     return roadmap.nodes.map(node => 
       node.connects.map(targetId => {
         const target = roadmap.nodes.find(n => n.id === targetId);
@@ -43,6 +47,17 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
       })
     ).flat();
   };
+
+  // Add safety check for roadmap data
+  if (!roadmap || !roadmap.nodes || !Array.isArray(roadmap.nodes)) {
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="text-center text-gray-500">
+          <p>Invalid roadmap data. Please try generating a new roadmap.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 overflow-auto">
@@ -144,7 +159,9 @@ function CourseRoadmapTool() {
         const allSubjects = await dataService.getAllSubjects();
         setSubjects(allSubjects);
         
-        // Update career relevance scores using Gemini API (non-blocking)
+        // Temporarily disable career relevance update to focus on main functionality
+        // TODO: Re-enable once main roadmap generation is working
+        /*
         if (process.env.REACT_APP_GEMINI_API_KEY) {
           try {
             console.log('Updating career relevance scores...');
@@ -156,6 +173,7 @@ function CourseRoadmapTool() {
             // Continue with original subjects if career relevance update fails
           }
         }
+        */
       } catch (error) {
         console.error('Error loading subjects:', error);
         setError('Failed to load syllabus data');
@@ -181,8 +199,18 @@ function CourseRoadmapTool() {
       console.log('Generating roadmap for:', dreamOccupation);
       console.log('Number of subjects available:', subjects.length);
       
+      if (subjects.length === 0) {
+        throw new Error('No subjects available. Please check if syllabus data is loading correctly.');
+      }
+
       const generatedRoadmap = await geminiService.generateRoadmap(dreamOccupation, subjects);
       console.log('Generated roadmap:', generatedRoadmap);
+      
+      // Validate the generated roadmap
+      if (!generatedRoadmap || !generatedRoadmap.nodes || !Array.isArray(generatedRoadmap.nodes)) {
+        throw new Error('Invalid roadmap data received from AI');
+      }
+      
       setRoadmap(generatedRoadmap);
     } catch (error) {
       console.error('Error generating roadmap:', error);

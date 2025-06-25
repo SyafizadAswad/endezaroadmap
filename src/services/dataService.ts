@@ -14,13 +14,22 @@ export class DataService {
     
     this.isLoading = true;
     try {
+      console.log('Loading syllabus data from /syllabus.json...');
       const response = await fetch('/syllabus.json');
+      console.log('Response status:', response.status);
+      console.log('Response ok:', response.ok);
+      
       if (!response.ok) {
-        throw new Error(`Failed to load syllabus: ${response.status}`);
+        throw new Error(`Failed to load syllabus: ${response.status} ${response.statusText}`);
       }
+      
       const data = await response.json();
+      console.log('Syllabus data loaded:', data);
+      console.log('Number of subjects in data:', data.subjects?.length || 0);
+      
       this.subjects = data.subjects as Subject[];
       this.isLoaded = true;
+      console.log('Subjects loaded successfully:', this.subjects.length);
     } catch (error) {
       console.error('Error loading syllabus data:', error);
       this.subjects = [];
@@ -33,6 +42,7 @@ export class DataService {
     if (!this.isLoaded) {
       await this.loadSubjects();
     }
+    console.log('getAllSubjects called, returning:', this.subjects.length, 'subjects');
     return this.subjects;
   }
 
