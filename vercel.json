@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "build",
+  "framework": "create-react-app",
+  "installCommand": "npm install",
+  "devCommand": "npm start",
+  "env": {
+    "REACT_APP_GEMINI_API_KEY": "@gemini-api-key"
+  }
+} 
