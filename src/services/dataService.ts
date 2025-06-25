@@ -4,13 +4,20 @@ export class DataService {
   private subjects: Subject[] = [];
   private isLoading: boolean = false;
   private isLoaded: boolean = false;
+  private loadPromise: Promise<void> | null = null;
 
   constructor() {
-    this.loadSubjects();
+    this.loadPromise = this.loadSubjects();
   }
 
-  private async loadSubjects() {
-    if (this.isLoading || this.isLoaded) return;
+  private async loadSubjects(): Promise<void> {
+    if (this.isLoading && this.loadPromise) {
+      return this.loadPromise;
+    }
+    
+    if (this.isLoaded) {
+      return;
+    }
     
     this.isLoading = true;
     try {
@@ -39,9 +46,11 @@ export class DataService {
   }
 
   async getAllSubjects(): Promise<Subject[]> {
-    if (!this.isLoaded) {
-      await this.loadSubjects();
+    // Wait for the initial load to complete
+    if (this.loadPromise) {
+      await this.loadPromise;
     }
+    
     console.log('getAllSubjects called, returning:', this.subjects.length, 'subjects');
     return this.subjects;
   }

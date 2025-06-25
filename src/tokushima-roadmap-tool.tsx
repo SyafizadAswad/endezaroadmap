@@ -156,7 +156,9 @@ function CourseRoadmapTool() {
     const loadSubjects = async () => {
       try {
         setIsLoadingData(true);
+        console.log('Starting to load subjects...');
         const allSubjects = await dataService.getAllSubjects();
+        console.log('Subjects loaded in component:', allSubjects.length);
         setSubjects(allSubjects);
         
         // Temporarily disable career relevance update to focus on main functionality
@@ -187,6 +189,11 @@ function CourseRoadmapTool() {
 
   const generateRoadmap = async () => {
     if (!dreamOccupation.trim()) return;
+    
+    if (isLoadingData) {
+      setError('Please wait for syllabus data to finish loading.');
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
@@ -305,10 +312,10 @@ function CourseRoadmapTool() {
               </div>
               <button
                 onClick={generateRoadmap}
-                disabled={isLoading || !dreamOccupation.trim() || !process.env.REACT_APP_GEMINI_API_KEY}
+                disabled={isLoading || isLoadingData || !dreamOccupation.trim() || !process.env.REACT_APP_GEMINI_API_KEY}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Generating...' : 'Generate'}
+                {isLoading ? 'Generating...' : isLoadingData ? 'Loading Data...' : 'Generate'}
               </button>
             </div>
           </div>
