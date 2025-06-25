@@ -16,7 +16,8 @@ export interface Subject {
   prerequisites: string[];
   keywords: string[];
   learning_outcomes: string[];
-  career_relevance: Record<string, number>;
+  career_relevance?: Record<string, number>;
+  career_relevance_reason?: Record<string, string>;
 }
 
 export interface RoadmapNode {
@@ -41,6 +42,17 @@ export interface GeneratedRoadmap {
   total_credits: number;
   reasoning: string;
 }
+
+const OCCUPATIONS = [
+  'electrical_engineer',
+  'power_engineer',
+  'electronics_engineer',
+  'communication_engineer',
+  'aerospace_engineer',
+  'software_engineer',
+  'control_engineer',
+  'robotics_engineer',
+];
 
 export class GeminiService {
   private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
@@ -92,20 +104,29 @@ export class GeminiService {
     }
   }
 
-  async updateCareerRelevance(subjects: Subject[]): Promise<Subject[]> {
-    try {
-      const prompt = this.createCareerRelevancePrompt(subjects);
-      const result = await this.model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
-      // Parse the JSON response, handling markdown formatting
-      const updatedSubjects = this.parseJSONResponse(text);
-      return updatedSubjects;
-    } catch (error) {
-      console.error('Error updating career relevance:', error);
-      return subjects; // Return original subjects if update fails
+  /**
+   * For each subject, get career_relevance and career_relevance_reason for all occupations.
+   * Returns a new array of subjects with these fields filled in.
+   */
+  async enrichSubjectsWithCareerRelevance(subjects: Subject[]): Promise<Subject[]> {
+    const enrichedSubjects: Subject[] = [];
+    for (const subject of subjects) {
+      try {
+        const prompt = this.createCareerRelevanceAndReasonPrompt(subject);
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        const parsed = this.parseJSONResponse(text);
+        enrichedSubjects.push({
+          ...subject,
+          career_relevance: parsed.career_relevance,
+          career_relevance_reason: parsed.career_relevance_reason,
+        });
+      } catch (error) {
+        enrichedSubjects.push({ ...subject });
+      }
     }
+    return enrichedSubjects;
   }
 
   private createRoadmapPrompt(occupation: string, subjects: Subject[]): string {
@@ -159,31 +180,31 @@ Focus on subjects that directly contribute to the skills and knowledge needed fo
 `;
   }
 
-  private createCareerRelevancePrompt(subjects: Subject[]): string {
+  /**
+   * Prompt Gemini to return both career_relevance and career_relevance_reason for all occupations for a subject.
+   */
+  private createCareerRelevanceAndReasonPrompt(subject: Subject): string {
     return `
-You are an expert career counselor. Analyze the following subjects and update their career relevance scores for different engineering occupations.
+You are an expert career counselor. Analyze the following subject and, for each of these occupations:
+${OCCUPATIONS.map(o => `- ${o}`).join('\n')}
 
-For each subject, evaluate its relevance to these occupations:
-- electrical_engineer
-- power_engineer  
-- electronics_engineer
-- communication_engineer
-- aerospace_engineer
-- software_engineer
-- control_engineer
-- robotics_engineer
+1. Give a relevance score (0.0 to 1.0) for how important this subject is for that occupation.
+2. Give a short reason (1-2 sentences) why this subject is relevant to that occupation, based on its syllabus and description.
 
-Consider:
-- Subject content and learning outcomes
-- Skills developed
-- Knowledge areas covered
-- Industry applications
+Subject:
+${JSON.stringify(subject, null, 2)}
 
-Score from 0.0 (not relevant) to 1.0 (highly relevant).
-
-IMPORTANT: Return ONLY the updated subjects array as valid JSON, no markdown formatting or additional text. Update only the career_relevance field for each subject. Keep all other fields unchanged.
-
-${JSON.stringify(subjects, null, 2)}
+Return ONLY a valid JSON object with this structure (no markdown, no extra text):
+{
+  "career_relevance": {
+    "electrical_engineer": 0.95,
+    ...
+  },
+  "career_relevance_reason": {
+    "electrical_engineer": "Reason why this subject is relevant to electrical engineering.",
+    ...
+  }
+}
 `;
   }
 }
