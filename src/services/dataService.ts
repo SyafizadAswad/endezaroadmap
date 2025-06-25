@@ -1,42 +1,61 @@
-import syllabusData from '../../syllabus.json';
 import { Subject } from './geminiService';
 
 export class DataService {
   private subjects: Subject[] = [];
+  private isLoading: boolean = false;
+  private isLoaded: boolean = false;
 
   constructor() {
     this.loadSubjects();
   }
 
-  private loadSubjects() {
+  private async loadSubjects() {
+    if (this.isLoading || this.isLoaded) return;
+    
+    this.isLoading = true;
     try {
-      this.subjects = syllabusData.subjects as Subject[];
+      const response = await fetch('/syllabus.json');
+      if (!response.ok) {
+        throw new Error(`Failed to load syllabus: ${response.status}`);
+      }
+      const data = await response.json();
+      this.subjects = data.subjects as Subject[];
+      this.isLoaded = true;
     } catch (error) {
       console.error('Error loading syllabus data:', error);
       this.subjects = [];
+    } finally {
+      this.isLoading = false;
     }
   }
 
-  getAllSubjects(): Subject[] {
+  async getAllSubjects(): Promise<Subject[]> {
+    if (!this.isLoaded) {
+      await this.loadSubjects();
+    }
     return this.subjects;
   }
 
-  getSubjectsByYear(year: number): Subject[] {
-    return this.subjects.filter(subject => subject.year === year);
+  async getSubjectsByYear(year: number): Promise<Subject[]> {
+    const subjects = await this.getAllSubjects();
+    return subjects.filter(subject => subject.year === year);
   }
 
-  getSubjectsBySemester(year: number, semester: number): Subject[] {
-    return this.subjects.filter(subject => 
+  async getSubjectsBySemester(year: number, semester: number): Promise<Subject[]> {
+    const subjects = await this.getAllSubjects();
+    return subjects.filter(subject => 
       subject.year === year && subject.semester === semester
     );
   }
 
-  getSubjectById(id: string): Subject | undefined {
-    return this.subjects.find(subject => subject.id === id);
+  async getSubjectById(id: string): Promise<Subject | undefined> {
+    const subjects = await this.getAllSubjects();
+    return subjects.find(subject => subject.id === id);
   }
 
-  getSubjectsByKeywords(keywords: string[]): Subject[] {
-    return this.subjects.filter(subject =>
+  async getSubjectsByKeywords(keywords: string[]): Promise<Subject[]> {
+    const subjects = await this.getAllSubjects();
+    return subjects.filter(subject =>
       keywords.some(keyword =>
         subject.keywords.some(k => k.toLowerCase().includes(keyword.toLowerCase())) ||
         subject.name.toLowerCase().includes(keyword.toLowerCase()) ||
@@ -45,12 +64,14 @@ export class DataService {
     );
   }
 
-  getTotalCredits(): number {
-    return this.subjects.reduce((total, subject) => total + subject.credits, 0);
+  async getTotalCredits(): Promise<number> {
+    const subjects = await this.getAllSubjects();
+    return subjects.reduce((total, subject) => total + subject.credits, 0);
   }
 
-  getSubjectsByCareerRelevance(occupation: string, threshold: number = 0.5): Subject[] {
-    return this.subjects.filter(subject => {
+  async getSubjectsByCareerRelevance(occupation: string, threshold: number = 0.5): Promise<Subject[]> {
+    const subjects = await this.getAllSubjects();
+    return subjects.filter(subject => {
       const relevance = subject.career_relevance[occupation.toLowerCase()];
       return relevance && relevance >= threshold;
     }).sort((a, b) => {

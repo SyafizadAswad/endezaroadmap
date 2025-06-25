@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Search, BookOpen, Target, Zap, Users, Wifi, CheckCircle, Circle, Brain, AlertCircle } from 'lucide-react';
-import { geminiService, GeneratedRoadmap, Subject } from './src/services/geminiService';
-import { dataService } from './src/services/dataService';
+import { Search, BookOpen, Target, Zap, Wifi, CheckCircle, Circle, Brain, AlertCircle, Loader2 } from 'lucide-react';
+import { geminiService, GeneratedRoadmap, Subject } from './services/geminiService';
+import { dataService } from './services/dataService';
 
 interface RoadmapFlowchartProps {
   roadmap: GeneratedRoadmap;
@@ -121,6 +121,7 @@ function CourseRoadmapTool() {
   const [dreamOccupation, setDreamOccupation] = useState('');
   const [roadmap, setRoadmap] = useState<GeneratedRoadmap | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [subjects, setSubjects] = useState<Subject[]>([]);
 
@@ -139,7 +140,8 @@ function CourseRoadmapTool() {
     // Load subjects on component mount
     const loadSubjects = async () => {
       try {
-        const allSubjects = dataService.getAllSubjects();
+        setIsLoadingData(true);
+        const allSubjects = await dataService.getAllSubjects();
         setSubjects(allSubjects);
         
         // Update career relevance scores using Gemini API
@@ -150,6 +152,8 @@ function CourseRoadmapTool() {
       } catch (error) {
         console.error('Error loading subjects:', error);
         setError('Failed to load syllabus data');
+      } finally {
+        setIsLoadingData(false);
       }
     };
 
@@ -202,6 +206,17 @@ function CourseRoadmapTool() {
       totalCredits: roadmap.total_credits
     };
   };
+
+  if (isLoadingData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-gray-600">Loading syllabus data...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
