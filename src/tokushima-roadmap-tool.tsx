@@ -236,22 +236,13 @@ function CourseRoadmapTool() {
   };
 
   useEffect(() => {
-    // Load subjects on component mount
+    // Load subjects on component mount (no Gemini enrichment)
     const loadSubjects = async () => {
       try {
         setIsLoadingData(true);
-        console.log('Starting to load subjects...');
         const allSubjects = await dataService.getAllSubjects();
-        console.log('Subjects loaded in component:', allSubjects.length);
-        // Enrich with Gemini API
-        if (process.env.REACT_APP_GEMINI_API_KEY) {
-          const enriched = await geminiService.enrichSubjectsWithCareerRelevance(allSubjects);
-          setSubjects(enriched);
-        } else {
-          setSubjects(allSubjects);
-        }
+        setSubjects(allSubjects);
       } catch (error) {
-        console.error('Error loading subjects:', error);
         setError('Failed to load syllabus data');
       } finally {
         setIsLoadingData(false);
@@ -272,21 +263,14 @@ function CourseRoadmapTool() {
       if (!process.env.REACT_APP_GEMINI_API_KEY) {
         throw new Error('Gemini API key not configured');
       }
-      console.log('Generating roadmap for:', dreamOccupation);
-      console.log('Number of subjects available:', subjects.length);
-      if (subjects.length === 0) {
-        throw new Error('No subjects available. Please check if syllabus data is loading correctly.');
-      }
-      const generatedRoadmap = await geminiService.generateRoadmap(dreamOccupation, subjects);
-      console.log('Generated roadmap:', generatedRoadmap);
-      if (!generatedRoadmap || !generatedRoadmap.nodes || !Array.isArray(generatedRoadmap.nodes)) {
-        throw new Error('Invalid roadmap data received from AI');
-      }
+      // Enrich subjects with Gemini for this occupation only
+      const enrichedSubjects = await geminiService.enrichSubjectsWithCareerRelevanceForOccupation(subjects, dreamOccupation);
+      setSubjects(enrichedSubjects); // update for details panel
+      const generatedRoadmap = await geminiService.generateRoadmap(dreamOccupation, enrichedSubjects);
       setRoadmap(generatedRoadmap);
       setSelectedSubject(null);
       setSelectedNodeId(null);
     } catch (error) {
-      console.error('Error generating roadmap:', error);
       if (error instanceof Error) {
         setError(`Failed to generate roadmap: ${error.message}`);
       } else {

@@ -129,6 +129,37 @@ export class GeminiService {
     return enrichedSubjects;
   }
 
+  /**
+   * For each subject, get career_relevance and career_relevance_reason for the given occupation only.
+   * Returns a new array of subjects with these fields filled in for that occupation.
+   */
+  async enrichSubjectsWithCareerRelevanceForOccupation(subjects: Subject[], occupation: string): Promise<Subject[]> {
+    const enrichedSubjects: Subject[] = [];
+    for (const subject of subjects) {
+      try {
+        const prompt = this.createCareerRelevanceAndReasonPromptForOccupation(subject, occupation);
+        const result = await this.model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+        const parsed = this.parseJSONResponse(text);
+        enrichedSubjects.push({
+          ...subject,
+          career_relevance: {
+            ...(subject.career_relevance || {}),
+            [occupation.toLowerCase()]: parsed.career_relevance[occupation.toLowerCase()]
+          },
+          career_relevance_reason: {
+            ...(subject.career_relevance_reason || {}),
+            [occupation.toLowerCase()]: parsed.career_relevance_reason[occupation.toLowerCase()]
+          }
+        });
+      } catch (error) {
+        enrichedSubjects.push({ ...subject });
+      }
+    }
+    return enrichedSubjects;
+  }
+
   private createRoadmapPrompt(occupation: string, subjects: Subject[]): string {
     return `
 You are an expert educational advisor at Tokushima University. Your task is to create a personalized course roadmap for a student aiming to become a ${occupation}.
@@ -203,6 +234,31 @@ Return ONLY a valid JSON object with this structure (no markdown, no extra text)
   "career_relevance_reason": {
     "electrical_engineer": "Reason why this subject is relevant to electrical engineering.",
     ...
+  }
+}
+`;
+  }
+
+  /**
+   * Prompt Gemini to return career_relevance and career_relevance_reason for a single occupation for a subject.
+   */
+  private createCareerRelevanceAndReasonPromptForOccupation(subject: Subject, occupation: string): string {
+    return `
+You are an expert career counselor. Analyze the following subject for the occupation: ${occupation}.
+
+1. Give a relevance score (0.0 to 1.0) for how important this subject is for that occupation.
+2. Give a short reason (1-2 sentences) why this subject is relevant to that occupation, based on its syllabus and description.
+
+Subject:
+${JSON.stringify(subject, null, 2)}
+
+Return ONLY a valid JSON object with this structure (no markdown, no extra text):
+{
+  "career_relevance": {
+    "${occupation.toLowerCase()}": 0.95
+  },
+  "career_relevance_reason": {
+    "${occupation.toLowerCase()}": "Reason why this subject is relevant to ${occupation}."
   }
 }
 `;
