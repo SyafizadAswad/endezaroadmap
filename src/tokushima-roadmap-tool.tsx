@@ -191,24 +191,6 @@ function SubjectDetailsPanel({ subject, onClose }: { subject: Subject | null, on
             {subject.learning_outcomes.map((item, idx) => <li key={idx}>{item}</li>)}
           </ul>
         </div>
-        {subject.career_relevance && (
-          <div><span className="font-semibold">Career Relevance:</span>
-            <ul className="list-disc list-inside text-sm text-gray-700 mt-1">
-              {Object.entries(subject.career_relevance).map(([career, score]) => (
-                <li key={career}>{career}: {Math.round(Number(score) * 100)}%</li>
-              ))}
-            </ul>
-          </div>
-        )}
-        {subject.career_relevance_reason && (
-          <div><span className="font-semibold">Relevance Reason:</span>
-            <ul className="list-disc list-inside text-sm text-gray-700 mt-1">
-              {Object.entries(subject.career_relevance_reason).map(([career, reason]) => (
-                <li key={career}><span className="font-semibold">{career}:</span> {reason}</li>
-              ))}
-            </ul>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -263,10 +245,8 @@ function CourseRoadmapTool() {
       if (!process.env.REACT_APP_GEMINI_API_KEY) {
         throw new Error('Gemini API key not configured');
       }
-      // Enrich subjects with Gemini for this occupation only
-      const enrichedSubjects = await geminiService.enrichSubjectsWithCareerRelevanceForOccupation(subjects, dreamOccupation);
-      setSubjects(enrichedSubjects); // update for details panel
-      const generatedRoadmap = await geminiService.generateRoadmap(dreamOccupation, enrichedSubjects);
+      // Just send all subjects and occupation to Gemini
+      const generatedRoadmap = await geminiService.generateRoadmap(dreamOccupation, subjects);
       setRoadmap(generatedRoadmap);
       setSelectedSubject(null);
       setSelectedNodeId(null);

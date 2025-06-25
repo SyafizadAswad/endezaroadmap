@@ -94,87 +94,23 @@ export class GeminiService {
       const result = await this.model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-      
-      // Parse the JSON response, handling markdown formatting
       const roadmapData = this.parseJSONResponse(text);
       return roadmapData;
     } catch (error) {
-      console.error('Error generating roadmap:', error);
       throw new Error('Failed to generate roadmap');
     }
-  }
-
-  /**
-   * For each subject, get career_relevance and career_relevance_reason for all occupations.
-   * Returns a new array of subjects with these fields filled in.
-   */
-  async enrichSubjectsWithCareerRelevance(subjects: Subject[]): Promise<Subject[]> {
-    const enrichedSubjects: Subject[] = [];
-    for (const subject of subjects) {
-      try {
-        const prompt = this.createCareerRelevanceAndReasonPrompt(subject);
-        const result = await this.model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        const parsed = this.parseJSONResponse(text);
-        enrichedSubjects.push({
-          ...subject,
-          career_relevance: parsed.career_relevance,
-          career_relevance_reason: parsed.career_relevance_reason,
-        });
-      } catch (error) {
-        enrichedSubjects.push({ ...subject });
-      }
-    }
-    return enrichedSubjects;
-  }
-
-  /**
-   * For each subject, get career_relevance and career_relevance_reason for the given occupation only.
-   * Returns a new array of subjects with these fields filled in for that occupation.
-   */
-  async enrichSubjectsWithCareerRelevanceForOccupation(subjects: Subject[], occupation: string): Promise<Subject[]> {
-    const enrichedSubjects: Subject[] = [];
-    for (const subject of subjects) {
-      try {
-        const prompt = this.createCareerRelevanceAndReasonPromptForOccupation(subject, occupation);
-        const result = await this.model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
-        const parsed = this.parseJSONResponse(text);
-        enrichedSubjects.push({
-          ...subject,
-          career_relevance: {
-            ...(subject.career_relevance || {}),
-            [occupation.toLowerCase()]: parsed.career_relevance[occupation.toLowerCase()]
-          },
-          career_relevance_reason: {
-            ...(subject.career_relevance_reason || {}),
-            [occupation.toLowerCase()]: parsed.career_relevance_reason[occupation.toLowerCase()]
-          }
-        });
-      } catch (error) {
-        enrichedSubjects.push({ ...subject });
-      }
-    }
-    return enrichedSubjects;
   }
 
   private createRoadmapPrompt(occupation: string, subjects: Subject[]): string {
     return `
 You are an expert educational advisor at Tokushima University. Your task is to create a personalized course roadmap for a student aiming to become a ${occupation}.
 
-Given the following subjects from the Electrical and Electronic System Course, create a roadmap that:
-1. Selects the most relevant subjects for the target occupation
-2. Organizes them in a logical learning sequence
-3. Respects prerequisites and academic year progression
-4. Provides reasoning for subject selection
+Given the following subjects (with their syllabi and details), select the most relevant subjects for the occupation of ${occupation} and generate a roadmap:
 
-Available subjects:
 ${JSON.stringify(subjects, null, 2)}
 
 Requirements:
-- Select 8-12 most relevant subjects
+- Select 8-12 most relevant subjects for the occupation
 - Organize by academic progression (year 1 → year 4)
 - Assign appropriate node types: 'foundation', 'core', 'specialized', 'elective'
 - Calculate x,y coordinates for visual layout (x: 100-700, y: 100-600)
@@ -208,59 +144,6 @@ IMPORTANT: Return ONLY a valid JSON object with this exact structure, no markdow
 }
 
 Focus on subjects that directly contribute to the skills and knowledge needed for ${occupation}.
-`;
-  }
-
-  /**
-   * Prompt Gemini to return both career_relevance and career_relevance_reason for all occupations for a subject.
-   */
-  private createCareerRelevanceAndReasonPrompt(subject: Subject): string {
-    return `
-You are an expert career counselor. Analyze the following subject and, for each of these occupations:
-${OCCUPATIONS.map(o => `- ${o}`).join('\n')}
-
-1. Give a relevance score (0.0 to 1.0) for how important this subject is for that occupation.
-2. Give a short reason (1-2 sentences) why this subject is relevant to that occupation, based on its syllabus and description.
-
-Subject:
-${JSON.stringify(subject, null, 2)}
-
-Return ONLY a valid JSON object with this structure (no markdown, no extra text):
-{
-  "career_relevance": {
-    "electrical_engineer": 0.95,
-    ...
-  },
-  "career_relevance_reason": {
-    "electrical_engineer": "Reason why this subject is relevant to electrical engineering.",
-    ...
-  }
-}
-`;
-  }
-
-  /**
-   * Prompt Gemini to return career_relevance and career_relevance_reason for a single occupation for a subject.
-   */
-  private createCareerRelevanceAndReasonPromptForOccupation(subject: Subject, occupation: string): string {
-    return `
-You are an expert career counselor. Analyze the following subject for the occupation: ${occupation}.
-
-1. Give a relevance score (0.0 to 1.0) for how important this subject is for that occupation.
-2. Give a short reason (1-2 sentences) why this subject is relevant to that occupation, based on its syllabus and description.
-
-Subject:
-${JSON.stringify(subject, null, 2)}
-
-Return ONLY a valid JSON object with this structure (no markdown, no extra text):
-{
-  "career_relevance": {
-    "${occupation.toLowerCase()}": 0.95
-  },
-  "career_relevance_reason": {
-    "${occupation.toLowerCase()}": "Reason why this subject is relevant to ${occupation}."
-  }
-}
 `;
   }
 }
