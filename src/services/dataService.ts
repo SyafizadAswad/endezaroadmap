@@ -91,11 +91,11 @@ export class DataService {
   async getSubjectsByCareerRelevance(occupation: string, threshold: number = 0.5): Promise<Subject[]> {
     const subjects = await this.getAllSubjects();
     return subjects.filter(subject => {
-      const relevance = subject.career_relevance[occupation.toLowerCase()];
+      const relevance = subject.career_relevance?.[occupation.toLowerCase()];
       return relevance && relevance >= threshold;
     }).sort((a, b) => {
-      const relevanceA = a.career_relevance[occupation.toLowerCase()] || 0;
-      const relevanceB = b.career_relevance[occupation.toLowerCase()] || 0;
+      const relevanceA = a.career_relevance?.[occupation.toLowerCase()] || 0;
+      const relevanceB = b.career_relevance?.[occupation.toLowerCase()] || 0;
       return relevanceB - relevanceA;
     });
   }
