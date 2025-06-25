@@ -9,6 +9,29 @@ interface RoadmapFlowchartProps {
 }
 
 function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
+  // Sort nodes by year and semester
+  const sortedNodes = [...(roadmap.nodes || [])].sort((a, b) => {
+    if (a.year !== b.year) return a.year - b.year;
+    return a.semester - b.semester;
+  });
+
+  // Auto-layout: assign x/y based on year/semester
+  const yearCount = Math.max(...sortedNodes.map(n => n.year));
+  const semestersPerYear = Math.max(...sortedNodes.map(n => n.semester));
+  const yStep = 120;
+  const xStep = 180;
+  const nodePositions: { [id: string]: { x: number; y: number } } = {};
+  let yearSemesterMap: { [key: string]: number } = {};
+
+  sortedNodes.forEach((node) => {
+    const y = 100 + (node.year - 1) * yStep;
+    // For each year, spread semesters horizontally
+    const key = `${node.year}-${node.semester}`;
+    yearSemesterMap[key] = (yearSemesterMap[key] || 0) + 1;
+    const x = 100 + (node.semester - 1) * xStep + (yearSemesterMap[key] - 1) * 30;
+    nodePositions[node.id] = { x, y };
+  });
+
   const getNodeColor = (node: any) => {
     if (node.completed) return 'bg-green-500 text-white border-green-600';
     
@@ -22,22 +45,23 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
   };
 
   const renderConnections = () => {
-    if (!roadmap.nodes || !Array.isArray(roadmap.nodes)) {
+    if (!sortedNodes || !Array.isArray(sortedNodes)) {
       return [];
     }
     
-    return roadmap.nodes.map(node => 
+    return sortedNodes.map(node => 
       node.connects.map(targetId => {
-        const target = roadmap.nodes.find(n => n.id === targetId);
+        const target = sortedNodes.find(n => n.id === targetId);
         if (!target) return null;
-
+        const from = nodePositions[node.id];
+        const to = nodePositions[target.id];
         return (
           <line
             key={`${node.id}-${targetId}`}
-            x1={node.x + 60}
-            y1={node.y + 20}
-            x2={target.x + 60}
-            y2={target.y + 20}
+            x1={from.x + 60}
+            y1={from.y + 20}
+            x2={to.x + 60}
+            y2={to.y + 20}
             stroke="#94a3b8"
             strokeWidth="2"
             strokeDasharray="5,5"
@@ -48,8 +72,7 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
     ).flat();
   };
 
-  // Add safety check for roadmap data
-  if (!roadmap || !roadmap.nodes || !Array.isArray(roadmap.nodes)) {
+  if (!roadmap || !sortedNodes || !Array.isArray(sortedNodes)) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="text-center text-gray-500">
@@ -70,18 +93,18 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
         </div>
       </div>
       
-      <div className="relative" style={{ minHeight: '600px', minWidth: '800px' }}>
+      <div className="relative" style={{ minHeight: `${yearCount * 140 + 100}px`, minWidth: `${semestersPerYear * 200 + 100}px` }}>
         <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
           {renderConnections()}
         </svg>
         
-        {roadmap.nodes.map(node => (
+        {sortedNodes.map(node => (
           <div
             key={node.id}
             className={`absolute border-2 rounded-lg p-3 cursor-pointer transition-all text-sm font-medium min-w-24 text-center shadow-sm ${getNodeColor(node)}`}
             style={{ 
-              left: node.x, 
-              top: node.y, 
+              left: nodePositions[node.id].x, 
+              top: nodePositions[node.id].y, 
               zIndex: 2,
               maxWidth: '140px'
             }}
