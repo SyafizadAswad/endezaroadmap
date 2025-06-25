@@ -12,24 +12,40 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
   // Sort nodes by year and semester
   const sortedNodes = [...(roadmap.nodes || [])].sort((a, b) => {
     if (a.year !== b.year) return a.year - b.year;
-    return a.semester - b.semester;
+    if (a.semester !== b.semester) return a.semester - b.semester;
+    return a.name.localeCompare(b.name);
   });
 
-  // Auto-layout: assign x/y based on year/semester
-  const yearCount = Math.max(...sortedNodes.map(n => n.year));
-  const semestersPerYear = Math.max(...sortedNodes.map(n => n.semester));
-  const yStep = 120;
-  const xStep = 180;
-  const nodePositions: { [id: string]: { x: number; y: number } } = {};
-  let yearSemesterMap: { [key: string]: number } = {};
-
-  sortedNodes.forEach((node) => {
-    const y = 100 + (node.year - 1) * yStep;
-    // For each year, spread semesters horizontally
+  // Group nodes by (year, semester)
+  const groupMap: { [key: string]: typeof sortedNodes } = {};
+  sortedNodes.forEach(node => {
     const key = `${node.year}-${node.semester}`;
-    yearSemesterMap[key] = (yearSemesterMap[key] || 0) + 1;
-    const x = 100 + (node.semester - 1) * xStep + (yearSemesterMap[key] - 1) * 30;
-    nodePositions[node.id] = { x, y };
+    if (!groupMap[key]) groupMap[key] = [];
+    groupMap[key].push(node);
+  });
+
+  // Get all unique (year, semester) pairs, sorted
+  const allYearSemPairs = Array.from(
+    new Set(sortedNodes.map(n => `${n.year}-${n.semester}`))
+  ).map(pair => pair.split('-').map(Number) as [number, number])
+   .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+
+  // Layout: columns for each (year, semester), stack vertically
+  const xStep = 180;
+  const yStep = 100;
+  const xStart = 100;
+  const yStart = 100;
+  const nodePositions: { [id: string]: { x: number; y: number } } = {};
+
+  allYearSemPairs.forEach(([year, semester], colIdx) => {
+    const key = `${year}-${semester}`;
+    const nodes = groupMap[key] || [];
+    nodes.forEach((node, rowIdx) => {
+      nodePositions[node.id] = {
+        x: xStart + colIdx * xStep,
+        y: yStart + rowIdx * yStep,
+      };
+    });
   });
 
   const getNodeColor = (node: any) => {
@@ -82,6 +98,11 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
     );
   }
 
+  // Calculate minWidth and minHeight for the container
+  const minWidth = xStart + allYearSemPairs.length * xStep + 200;
+  const maxStack = Math.max(...Object.values(groupMap).map(nodes => nodes.length));
+  const minHeight = yStart + maxStack * yStep + 200;
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 overflow-auto">
       <div className="mb-4">
@@ -93,7 +114,7 @@ function RoadmapFlowchart({ roadmap, onNodeClick }: RoadmapFlowchartProps) {
         </div>
       </div>
       
-      <div className="relative" style={{ minHeight: `${yearCount * 140 + 100}px`, minWidth: `${semestersPerYear * 200 + 100}px` }}>
+      <div className="relative" style={{ minHeight, minWidth }}>
         <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 1 }}>
           {renderConnections()}
         </svg>
